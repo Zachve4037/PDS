@@ -3,6 +3,10 @@ create or replace view test_osoba as
     from P_OSOBA
     left join p_poistenie using(rod_cislo);
 
+select * from test_osoba;
+
+drop view test_osoba;
+
 create or replace view test_pocet_mesta as
     select PSC, count(rod_cislo)
     from p_mesto
@@ -70,3 +74,33 @@ as
     end;
     /
 
+select rod_cislo
+from p_osoba
+where exists(
+    select 'X' from p_poistenie
+    where p_osoba.rod_cislo = p_poistenie.rod_cislo
+);
+
+select id_poistenca
+from p_poistenie
+where exists(
+    select id_poistenca from p_odvod_platba
+    where p_odvod_platba.id_poistenca = p_poistenie.id_poistenca
+    group by id_poistenca
+    having count(id_poistenca) >= 2
+);
+
+
+select * from p_typ_prispevku
+where id_typu in (
+    select id_typu from p_prispevky
+    group by id_typu
+    having count(id_typu) >= 3
+    );
+
+select rod_cislo
+from p_osoba
+where not exists (
+    select rod_cislo from p_poistenie
+                     where p_poistenie.rod_cislo = p_osoba.rod_cislo
+);
