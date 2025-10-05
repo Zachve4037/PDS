@@ -73,7 +73,6 @@ as
         end loop;
     end;
     /
-
 select rod_cislo
 from p_osoba
 where exists(
