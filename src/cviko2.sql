@@ -80,3 +80,51 @@ select meno, priezvisko,
 from OS_UDAJE
 left join student using(rod_cislo)
 group by meno, priezvisko, rod_cislo;
+
+declare
+    i integer;
+    chyba exception;
+    pragma exception_init ( chyba, -20000 );
+begin
+    select count(*) into i
+    from STUDENT
+        where rod_cislo='800407/3522';
+    if i > 1 then
+        raise_application_error(-20000, 'osoba studovala viackrat');
+    end if;
+    exception when others
+    then DBMS_OUTPUT.PUT_LINE(SQLcode);
+        DBMS_OUTPUT.PUT_LINE(SQLERRM);
+end;
+/
+
+declare
+    v_int integer:= 1;
+begin
+    declare
+        v_char char(1):='x';
+    begin
+        v_int:=2;
+        DBMS_OUTPUT.PUT_LINE(v_int);
+        DBMS_OUTPUT.PUT_LINE(v_char);
+    end;
+    DBMS_OUTPUT.PUT_LINE(v_int);
+end;
+/
+
+<<outer>>
+    declare
+    v_int integer:=1;
+begin
+    <<inner>>
+        declare
+        v_int integer:=2;
+    begin
+        v_int:=2;
+        dbms_output.put_line(v_int); -- 2
+        dbms_output.put_line(inner.v_int); -- 2
+        dbms_output.put_line(outer.v_int); -- 1
+    end;
+    dbms_output.put_line(v_int); -- 1
+end;
+/
