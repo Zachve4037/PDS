@@ -1,67 +1,71 @@
-set serveroutput on;
-
-declare cursor tab_rename
-    is
-        select 'Alter table ' || table_name || 'rename to ' || 'st_' ||  table_name from tabs;
-        text varchar(200);
+declare
+    cursor tab_rename is
+        select 'alter table ' || table_name || ' rename to st_' || table_name
+        from tabs;
+    text varchar2(200);
 begin
     open tab_rename;
     loop
         fetch tab_rename into text;
+        exit when tab_rename%NOTFOUND;
         dbms_output.put_line(text);
-        exit when tab_rename%notfount;
         execute immediate text;
     end loop;
-    close tab_renam;
+    close tab_rename;
 end;
 /
+
+rollback;
 
 declare cursor tab_rename
     is
-select 'Alter table ' || table_name || 'rename to ' || substr(table_name, 4) from tabs;
-text varchar(200);
-begin
-open tab_rename;
-loop
-fetch tab_rename into text;
-        dbms_output.put_line(text);
-        exit when tab_rename%notfount;
-execute immediate text;
-end loop;
-close tab_renam;
+        select 'Alter table ' || table_name || 'rename to ' || substr(table_name, 4) from tabs;
+            text varchar(200);
+    begin
+        open tab_rename;
+        loop
+            fetch tab_rename into text;
+            exit when tab_rename%notfound;
+            dbms_output.put_line(text);
+            execute immediate text;
+        end loop;
+    close tab_rename;
 end;
 /
 
-desc user_procedures; --vypise zoznam atributov z tabulky
+DESC USER_PROCEDURES; --vypise zoznam atributov z tabulky
 select * from user_procedures;
 
 select 'Alter ' || object_type || ' ' || object_name || ' compile'
     from all_procedures
     where object_type = upper('procedure') or object_type = upper('function');
 
-create or replace type t_osoba is object(
+rollback;
+
+create or replace type osoba is object(
        rod_cislo char(1),
        meno varchar2(20),
        priezvisko varchar(20)
 );
 /
 
-create table osoby
+create table t_osoby_a
 (
-    osoba t_osoba
+    osoba_col osoba
 );
 /
 
-create table osoby of t_osoba;
+rollback;
 
-insert into osoby
-    select t_osoba(rod_cislo, meno, priezvisko)
+create table t_osoby_o of osoba;
+
+insert into t_osoby_a
+    select osoba(rod_cislo, meno, priezvisko)
     from os_udaje;
 
-insert into osoby
-select rod_cislo, meno, priezvisko
-from os_udaje;
-
+insert into t_osoby_o
+    select rod_cislo, meno, priezvisko
+    from os_udaje;
 
 select rod_cislo, rn
 from (
@@ -81,6 +85,22 @@ delete from osoby
  );
 
 -- spravit bez rowid();
+with duplicates as(
+    select *
+    from (
+             select rod_cislo, row_number() over (partition by rod_cislo) as rn
+             from osoby
+         )
+    where rn > 1
+)
+delete from osoby o
+where exists(
+    select 1
+    from duplicates d
+    where o.rod_cislo = d.rod_cislo
+      and o.meno = d.meno
+      and o.priezvisko = d.priezvisko
+);
 
 alter type t_osoba add member function den_narodenia return varchar cascade;
 
@@ -163,4 +183,4 @@ insert into osoby2 select t_osoba(rod_cislo, meno, priezvisko) from osoby;
 insert into osoby2 select value(o) from osoby;
 
 --prerobit na tabulku kde objekt je ako atribut
---zrusit order metodu a pripravit obdony variant pre map namiesto order
+--zrusit order metodu a pripravit obdobny variant pre map namiesto order
