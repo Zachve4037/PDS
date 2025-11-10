@@ -13,7 +13,19 @@ where rod_cislo not in (
     join st_st_odbory o on(s.st_odbor = o.st_odbor and s.st_zameranie = o.st_zameranie)
     where popis_odboru = 'Informatika'
     );
+
 -- napisat cez not exists!!!
+select os.meno, os.priezvisko
+from st_os_udaje os
+left join st_student st on st.rod_cislo = os.rod_cislo
+where not exists (
+    select 1
+    from st_student s
+    join st_st_odbory o on s.st_odbor = o.st_odbor and s.st_zameranie = o.st_zameranie
+    where s.rod_cislo = os.rod_cislo
+    and o.popis_odboru = 'Informatika'
+);
+
 
 --vypiste osoby a k nim studentske udaje ak je osoba druhakom
 select * from st_os_udaje os
@@ -42,6 +54,11 @@ drop table tab_t_person;
 -- DOMACA ULOHA naplnit + prerobit do tabulky kde je objekt ako atribut
 
 rollback;
+
+create table t_t_person_attr (
+    id number,
+    person t_person_obj
+);
 
 --tu si spusti objednavky.sql a skladove_zaznamy.sql z teams/PDS/cvicenia/7
 -- ANO JE TO FOKIN Z ANALYTIKY HAHA MENTAL BREAKDOWN HAHA

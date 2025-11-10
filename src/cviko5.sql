@@ -60,9 +60,14 @@ delete from table(select kolekcia from kolekcie)nested where nested.column_value
 --json (element: meno, priezvisko, jsonpole[os_cislo], jsonpole[json(cis_predm, vysledok)])
 select json_object('meno' value meno,
                    'priezvisko' value priezvisko,
-                    'os_cisla' value json_arrayagg(os_cislo)
+                    'os_cisla' value json_arrayagg(os_cislo),
                     'prems' value json_object(
                            'cislo_predmetu' value cis_predm,
                            'vysledok' value vysledok))
-    )
 from os_udaje join ZAP_PREDMETY using(os_cislo);
+
+select * from student;
+
+select user from dual;
+select sys_context('USERENV', 'CURRENT_USER') from dual;
+select owner, table_name from all_tables where table_name = upper('student');
