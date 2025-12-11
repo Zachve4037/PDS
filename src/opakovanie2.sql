@@ -432,3 +432,75 @@ select s.cele_meno() from tab_students s;
 
 rollback;
 
+drop table tab_students;
+drop type tt_student;
+commit;
+
+--3. Do objektového typu t_studium pridajte MEMBER procedúru 
+--ukonci(p_datum DATE), ktorá nastaví atribút dat_ukoncenia na zadaný dátum; 
+--napíšte príkaz, ktorým ukončíte štúdium konkrétneho študenta 
+--(vyberte podľa rod_cislo) k dátumu 30.06.2003 v objektovej tabuľke studium_obj.
+create or replace type t_studium as object (
+    os_cislo integer,
+    st_odbor number,
+    st_zameranie number,
+    dat_ukoncenia date,
+    member procedure ukonci(p_datum Date)
+);
+/
+
+create or replace type body t_studium as
+ member procedure ukonci(p_datum Date) is
+  begin
+    self.dat_ukoncenia := p_datum;
+  end ukonci;
+end;
+/
+ 
+
+ 
+declare
+    v_studium t_studium;
+begin
+    select value(s) into v_studium
+    from student s
+    where s.rod_cislo = '123456/1234';
+    
+    v_studium.ukonci(to_date('30.06.2003', 'DD.MM.YYYY')
+    
+    update studium_obj
+    set s = v_studium
+    where s.rod_cislo = '123456/1234';
+end;
+/
+
+
+--4. Vytvorte objektovú tabuľku zapisy_obj OF t_zapis_predmetu (atribúty napr. 
+--os_cislo, cis_predm, skrok, vysledok) a napíšte INSERT, ktorý do nej vloží 
+--všetky zápisy predmetov študentov odboru „Informatika“ v školskom roku 2003; 
+--údaje čerpajte z tabuliek student, st_odbor a zap_predmety, pričom 
+--predpokladajte, že typ t_zapis_predmetu má vhodný konštruktor.
+create or replace type t_zapis_predmetu as object (
+    os_cislo number,
+    cis_predm char(5),
+    skrok number,
+    vysledok char(1)
+);
+/
+
+create or replace type zapisy_obj as table of t_zapis_predmetu;
+/
+
+
+insert into zapisy_obj 
+ select t_zapis_predmetu(
+        zp.os_cislo, 
+        zp.cis_predm, 
+        zp.skrok, 
+        zp.vysledok
+    )
+ from zap_predmety zp
+ join student s on(s.os_cislo = zp.os_cislo)
+ join st_odbory z on(s.st_odbor = z.st_odbor and s.st_zameranie = z.st_zameranie)
+ where popis_odboru = 'Informatika'
+  and skrok = 2003;
