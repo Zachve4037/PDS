@@ -504,3 +504,384 @@ insert into zapisy_obj
  join st_odbory z on(s.st_odbor = z.st_odbor and s.st_zameranie = z.st_zameranie)
  where popis_odboru = 'Informatika'
   and skrok = 2003;
+  
+--1
+insert into tomas.backup_predmet@remote_link select * from p_predmet;
+
+--2
+insert into lenka.data_vzdelanie@remote_link select * from p_vzdelanie;
+
+--3
+insert into lenka.log_osoby@remote_link 
+    select * from p_osoba 
+     where id_osoby not in(
+        select id_osoby
+        from log_osoby
+    );
+    
+--4
+update p_poistenie p
+    set dat_do = sysdate
+    where exists (
+        select 1 from dusan.data_osoby@remote_link d 
+         where d.id_osoby = p.id_osoby
+);
+
+--5
+update p_zamestnanec pz
+set stav_zamestnania = 'NEAKTIVNY'
+where id_zamestnanca in (
+    select * from tomas.inactive_ids@remote_link t
+    where pz.id_zamestnanca = t.id_zamestnanca
+    );
+    
+--6
+update p_student s
+set ukoncenie
+where os_cislo in (
+    select * from lenka.ukonceni_studenti@remote_link l
+    where s.os_cislo = l.os_cislo
+);
+
+--7
+insert into p_predmet
+select * from martin.predmet_link@remote_link;
+
+--8
+insert into p_ucty
+select * from lenka.backup_ucty@remote_link;
+
+--9
+delete from p_poberatel p
+where exists (
+    select id_poberatela
+    from andrea.del_ids@remote_link a
+    where p.id_poberatela = a.id_poberatela
+);
+
+--10
+delete from p_nepritomnost n
+where exists (
+    select * 
+    from tomas.del_neprit@remote_link t
+    where t.id_neprit = n.id_neprit
+);
+
+--11
+select 'DROP INDEX ' || index_name || ';' 
+from user_indexes
+where table_name = 'p_poistenie'
+and index_type = 'NORMAL';
+
+--12
+--what the fuck ved nemozes mat rovnake indexy
+select 'DROP INDEX ' || index_name || ';'
+from user_indexes
+where table_name = 'p_mesto'
+and usert_constraints <> 'U';
+
+--13
+select 'alter index ' || index_name || 'rebuild;'
+from user_indexes ui
+where ui.table_name in (
+    select table_name
+     from user_constraint us
+     where us.constraint_type = 'R'
+);
+
+--INDEXI
+create index ind on p_osoba(lower(priezvisko));
+create index ind on p_osoba(psc);
+create index ind on p_prispevky(extract(year from kedy));
+create index ind on p_postihnutie(lower(nazov));
+create index ind on zamestnanec(case when datum_do is null then 1 end);
+create index ind on p_osoba(substr(rod_cislo, 1, 1));
+
+--JSON
+--50
+select json_value(b.doc, '$.nazov') as nazov
+from kniha_json b where json_value(b.doc, '$.autor') like 'M%';
+
+--51
+select json_value(b.doc, '$.nazov') as nazov
+from kniha_json b where to_number(json_value(b.doc, '$.rok_vydania')) > 2010;
+
+--52
+select json_value(b.doc, '$.student') as stud
+from student_json b where to_number(json_value(b.doc, '$.rocnik')) > 2;
+
+--53
+select json_value(b.doc, '$.meno') as mena
+from student_json b where to_number(json_value(b.doc, '$.priemer')) < 2.0;
+
+--54
+select b.doc from produkt_json b where to_number(json_value(b.doc, '$.cena')) > 20;
+
+--56
+select z.doc from zamestnanec z where json_value(z.doc, '$.pozicia') = 'MANAGER';
+/
+--CONNECT BY LEVEL
+--69
+with mesiace as (
+    select level as mesiac
+    from dual 
+    connect by level <= 12
+)
+select mesiac, to_char(to_date(mesiac, 'MM'), 'Month') as nazov_mesiaca, count(p.dat_od) as pocet
+    from mesiace m
+    left join p_poistenie p on (extract(month from p.dat_od) = m.mesiac
+    and extract(year from p.dat_od) = extract(year from sysdate) -1)
+    group by mesiac
+    order by mesiac;
+    
+--70
+with mesiace as (
+    select level as mesiac
+    from dual
+    connect by level <= 12
+) select mesiac, to_char(to_date(mesiac, 'MM'), 'Month') as nazov_mes, count(dat_do)
+    from mesiace m
+    left join p_poistenie p
+    on (extract(month from p.dat_do) = m.mesiac 
+        and extract(year from p.dat_do) = extract(year from sysdate) -1)
+    where dat_do <> null
+    group by mesiac
+    order by mesiac;
+    
+--71
+with mesiace as (
+    select level as mesiac
+    from dual
+    connect by level <= 12
+) select mesiac, to_char(to_date(mesiac, 'MM'), 'Month') as nazov_mes, count(id_zamestnavatela)
+    from mesiace m
+    left join p_zamestnanec p
+    on (extract(month from dat_od) = m.mesiac and extract(year from dat_od) = extract(year from sysdate) -1)
+    group by mesiac
+    order by mesiac;
+   
+--73
+with dni as (
+    select trunc(sysdate, 'year') - level as den
+    from dual
+    connect by level <= 366
+) select den, count(kedy)
+    from dni d
+    left join p_prispevky p on (trunc(p.kedy) = d.den)
+    group by den
+    order by den;
+    
+--74
+with dni as (
+    select to_date(extract(year from sysdate) - 1 || '-04-01', 'YYYY-MM-DD') + level - 1 as datum
+    from dual
+    connect by level <= 30
+) select datum, count(rod_cislo)
+    from dni d
+    left join p_zamestnanec p on p.dat_od = d.datum
+    group by datum
+    order by datum;
+    
+with dni as (
+    select to_date(extract(year from sysdate) - 1 || '-05-01', 'YYYY-MM-DD') + level -1 as datum
+    from dual
+    connect by level <= 31
+) select * from dni;
+
+--75
+with dni as (
+    select to_date(extract(year from sysdate) -1 || '-07-01', 'YYYY-MM-DD') + level -1 as datum
+    from dual
+    connect by level <= 92
+) select datum, count(id_poistenca)
+    from dni d
+    left join p_poistenie p on p.dat_do = d.datum
+    group by datum
+    order by datum;
+    
+--76
+with dni as (
+    select trunc(sysdate, 'year') - level as datum
+    from dual
+    connect by level <= 366
+) select * from dni;
+
+--77
+with mesiace as (
+    select level as mesiac
+    from dual
+    connect by level <= 12
+) select mesiac, to_char(to_date(mesiac, 'MM'), 'Month') as nazov_mes from mesiace;
+
+--78
+with dni as (
+    select to_date(extract(year from sysdate) - 1 || '-05-01', 'YYYY-MM-DD') + level - 1 as datum
+    from dual
+    connect by level <= 31
+) select * from dni;
+
+--79
+with mesiace as (
+    select level as mesiac
+    from dual
+    connect by level <= 12
+) select mesiac, to_char(to_date(mesiac, 'MM'), 'Month') as nazov_mes
+    from mesiace;
+
+--80
+with mesiace as (
+    select level as mesiac
+    from dual
+    connect by level <= 12
+) select mesiac, to_char(to_date(mesiac, 'MM'), 'Month') as nazov_mes
+    from mesiace;
+    
+--81
+with dni as (
+    select to_date(extract(year from sysdate) -1 || '-01-01', 'YYYY-MM-DD') + level - 1 as den
+    from dual
+    connect by level <= 31
+) select * from dni;
+
+--82
+with mesiace as (
+    select level as mesiac
+    from dual
+    connect by level <= 12
+) select to_char(to_date(mesiac, 'MM'), 'Month') as nazov_mes
+    from mesiace;
+
+--83
+with dni as (
+    select to_date(extract(year from sysdate) -1 || '-12-01', 'YYYY-MM-DD') + level - 1 as datum
+    from dual
+    connect by level <=31
+) select * from dni;
+
+--84
+with mesiace as (
+    select level as mesiac
+    from dual
+    connect by level <= 12
+) select to_char(to_date(mesiac, 'MM'), 'Month') as nazov_mes
+    from mesiace;
+    
+--85
+with dni as (
+    select trunc(sysdate, 'year') - level as datum
+    from dual
+    connect by level <= 366
+) select * from dni;
+
+--mesiace
+with mesiace as (
+    select level as mesiac
+    from dual
+    connect by level <= 12
+) select to_char(to_date(mesiac, 'MM'), 'Month') as nazov_mes from mesiace;
+
+--dni v mesiaci
+with dni as (
+    select to_date(extract(year from sysdate) -1 || '01-01', 'YYYY-MM-DD') + level -1 as datum
+    from dual
+    connect by level <= 31
+) select * from dni;
+
+--vsetky dni v roku
+with dni as (
+    select trunc(sysdate, 'year') - level as den
+    from dual
+    connect by level <=366
+) select * from dni;
+
+--mesiace
+with mesiace as (
+    select level as mesiac
+    from dual
+    connect by level <= 12
+) select to_char(to_date(mesiac, 'MM'), 'Month') as nazov_mes
+    from mesiace;
+    
+--dni v najuari 
+with dni as (
+    select to_date(extract(year from sysdate) -1 || '-01-01', 'YYYY-MM-DD') + level - 1 as datum
+    from dual
+    connect by level <= 31
+) select * from dni;
+
+--dni v roku
+with dni as (
+    select trunc(sysdate, 'year') - level
+    from dual
+    connect by level <= 366
+) select * from dni;
+
+
+--mame index idx(rod_cislo, meno, priezvisko)
+select meno, priezvisko
+from os_udaje
+where substr(rod_cislo, 5, 1) = '4'; --aku pristupovu metodu pouzijeme?
+
+--vypiste pocet prispevkov. Vypiste to ale do stlpcov je_poistenec a nie je poistenec
+select
+    case when rod_cislo in (select rod_cislo from p_poistenie) then count(id_poberatela) else 0 end as je_poistenec,
+    case when rod_cislo not in (select rod_cislo from p_poistenie) then count(id_poberatela) else 0 end as nie_je_poistenec
+ from p_prispevky
+ left join p_poberatel using(id_poberatela)
+ left join p_osoba using(rod_cislo)
+ left join p_poistenie using(rod_cislo)
+ group by rod_cislo;
+ 
+--pre kazdy mesiac v minulom roku vypiste sumu prispevkov pre tento mesiac
+with mesiace as (
+    select level as mesiac
+    from dual
+    connect by level <= 12
+) select mesiac, sum(suma)
+ from mesiace
+ --neviem ci som dal left ci co xd
+ left join p_prispevky on extract(month from kedy) = mesiac
+ where extract(year from kedy) = extract(year from sysdate) -1
+ group by mesiac;
+ 
+--vytvorte kolekciu t_pole (rod_cislo, meno, priezvisko, getVek)
+--vytvorte tabulku kde bude t_pole ako atribut
+--naplnte kolekciu METODOU napln_pole(nazov_tabulky, nazov_atributu)
+--nasledne vymazte z tabulky zaznamy kde je vek > 25
+create or replace type tt_pole as object(
+    rod_cislo char(11),
+    meno varchar2(20),
+    priezvisko varchar2(20),
+    member function dajVek return integer
+);
+/
+
+create or replace type body tt_pole as 
+    member function dajVek return integer is
+     begin
+        return months_between(to_date(
+            substr(rod_cislo, 5, 2) || '-' || 
+            mod(substr(rod_cislo, 3, 2), 50) || '-' || 
+            substr(rod_cislo, 1, 2), 'DD-MM-YY'),
+            sysdate) / 12;
+     end dajVek;
+end;
+/
+
+rollback;
+
+create table tab_pole (
+    attr tt_pole
+);
+
+--tu som zabudol typy parametrov PICA
+create or replace function napln_kolekciu(nazov_tab varchar2, nazov_attr) as
+begin
+ select 'INSERT INTO ' || nazov_tab || ' VALUES (
+ t_pole('12345678901', 'PDS1', 'PDS1'),
+ t_pole('12345678901', 'PDS2', 'PDS2'));' --taktiez som neukoncil
+end;
+/
+
+delete from tab_pole
+where attr.dajVek > 25;
