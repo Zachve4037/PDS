@@ -844,7 +844,7 @@ with mesiace as (
  where extract(year from kedy) = extract(year from sysdate) -1
  group by mesiac;
  
---vytvorte kolekciu t_pole (rod_cislo, meno, priezvisko, getVek)
+--vytvorte kolekciu t_pole (rod_cislo, meno, priezvisko, dajVek)
 --vytvorte tabulku kde bude t_pole ako atribut
 --naplnte kolekciu METODOU napln_pole(nazov_tabulky, nazov_atributu)
 --nasledne vymazte z tabulky zaznamy kde je vek > 25
@@ -884,4 +884,4 @@ end;
 /
 
 delete from tab_pole
-where attr.dajVek > 25;
+where attr.dajVek() > 25;
